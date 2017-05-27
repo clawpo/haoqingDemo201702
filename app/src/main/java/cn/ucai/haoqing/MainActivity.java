@@ -23,7 +23,7 @@ import static cn.ucai.haoqing.GattAttributes.SCAN_PERIOD;
 public class MainActivity extends AppCompatActivity {
 
     private BluetoothAdapter mBluetoothAdapter;
-    private boolean mScanning;
+    private boolean mScanning,isConnected;
     private Handler mHandler;
     private static final int REQUEST_ENABLE_BT = 1;
 
@@ -38,6 +38,16 @@ public class MainActivity extends AppCompatActivity {
         initView();
         mHandler = new Handler();
         checkBLESupported();
+        setListener();
+    }
+
+    private void setListener() {
+        layout.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                scanLeDevice(true);
+            }
+        });
     }
 
     private void initView() {
@@ -124,6 +134,14 @@ public class MainActivity extends AppCompatActivity {
 
     private void updateStatus() {
         dialog.setVisibility(mScanning? View.VISIBLE:View.GONE);
+        mtvStatus.setText(mScanning?R.string.connectioning:R.string.disconnected);
+        if (!mScanning && !isConnected){
+            mtvData.setText(R.string.rescan);
+            layout.setEnabled(true);
+        }else{
+            mtvData.setText("");
+            layout.setEnabled(false);
+        }
     }
 
 
