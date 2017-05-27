@@ -136,7 +136,7 @@ public class MainActivity extends AppCompatActivity {
                 public void run() {
                     mScanning = false;
                     mBluetoothAdapter.stopLeScan(mLeScanCallback);
-                    updateStatus();
+                    updateStatus(0);
                 }
             }, SCAN_PERIOD);
 
@@ -146,12 +146,16 @@ public class MainActivity extends AppCompatActivity {
             mScanning = false;
             mBluetoothAdapter.stopLeScan(mLeScanCallback);
         }
-        updateStatus();
+        updateStatus(0);
     }
 
-    private void updateStatus() {
+    private void updateStatus(int stringId) {
         dialog.setVisibility(mScanning? View.VISIBLE:View.GONE);
-        mtvStatus.setText(mScanning?R.string.connectioning:R.string.disconnected);
+        if (stringId>0){
+            mtvStatus.setText(stringId);
+        }else {
+            mtvStatus.setText(mScanning ? R.string.connectioning : R.string.disconnected);
+        }
         if (!mScanning && !isConnected){
             mtvData.setText(R.string.rescan);
             layout.setEnabled(true);
@@ -191,7 +195,7 @@ public class MainActivity extends AppCompatActivity {
         if (mScanning) {
             mBluetoothAdapter.stopLeScan(mLeScanCallback);
             mScanning = false;
-            updateStatus();
+            updateStatus(0);
         }
         connectionYunMai();
     }
@@ -222,6 +226,9 @@ public class MainActivity extends AppCompatActivity {
         if (mBluetoothLeService != null) {
             final boolean result = mBluetoothLeService.connect(yunmaiDevice.getAddress());
             Log.d(TAG, "Connect request result=" + result);
+            if (result){
+                updateStatus(R.string.connected);
+            }
         }
     }
 
@@ -238,12 +245,10 @@ public class MainActivity extends AppCompatActivity {
             Log.e(TAG,"mGattUpdateReceiver,action="+action);
             if (BluetoothLeService.ACTION_GATT_CONNECTED.equals(action)) {
                 isConnected = true;
-                updateConnectionState(R.string.connected);
-                invalidateOptionsMenu();
+                updateStatus(R.string.connected);
             } else if (BluetoothLeService.ACTION_GATT_DISCONNECTED.equals(action)) {
                 isConnected = false;
-                updateConnectionState(R.string.disconnected);
-                invalidateOptionsMenu();
+                updateStatus(R.string.disconnected);
                 clearUI();
             } else if (BluetoothLeService.ACTION_GATT_SERVICES_DISCOVERED.equals(action)) {
                 // Show all the supported services and characteristics on the user interface.
@@ -310,10 +315,6 @@ public class MainActivity extends AppCompatActivity {
 
     private void clearUI() {
         mtvData.setText(R.string.no_data);
-    }
-
-    private void updateConnectionState(int connected) {
-        mtvStatus.setText(connected);
     }
 
     private static IntentFilter makeGattUpdateIntentFilter() {
