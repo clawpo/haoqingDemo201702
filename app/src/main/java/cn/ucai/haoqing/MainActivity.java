@@ -30,6 +30,7 @@ public class MainActivity extends AppCompatActivity {
     TextView mtvStatus,mtvData;
     ProgressBar dialog;
     ConstraintLayout layout;
+    BluetoothDevice yunmaiDevice;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -158,11 +159,28 @@ public class MainActivity extends AppCompatActivity {
                                 Log.e("scan", "mLeScanCallback,device:" + device.getName() + "," + device.getAddress());
                                 if (device.getName()!=null && device.getName().equals(DEVICE_NAME_YUNMAI_WEIGHT)) {
                                     Log.e("scan", "scan yunmai,aotu connection...");
-//                                    gotoDeviceControl(device);
+                                    yunmaiDevice = device;
+                                    gotoDeviceControl();
                                 }
                             }
                         }
                     });
                 }
             };
+
+
+    private void gotoDeviceControl() {
+        Log.e("scan","gotoDeviceControl,deivce="+yunmaiDevice.getName()+","+yunmaiDevice.getAddress());
+        if (yunmaiDevice == null) return;
+        if (mScanning) {
+            mBluetoothAdapter.stopLeScan(mLeScanCallback);
+            mScanning = false;
+            updateStatus();
+        }
+        connectionYunMai();
+    }
+
+    private void connectionYunMai() {
+
+    }
 }
