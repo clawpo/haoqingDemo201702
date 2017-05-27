@@ -9,8 +9,10 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.os.Handler;
+import android.support.constraint.ConstraintLayout;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
+import android.view.View;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -25,8 +27,9 @@ public class MainActivity extends AppCompatActivity {
     private Handler mHandler;
     private static final int REQUEST_ENABLE_BT = 1;
 
-    TextView mtvStatus;
+    TextView mtvStatus,mtvData;
     ProgressBar dialog;
+    ConstraintLayout layout;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -39,7 +42,9 @@ public class MainActivity extends AppCompatActivity {
 
     private void initView() {
         mtvStatus = (TextView) findViewById(R.id.tv_status);
+        mtvData = (TextView) findViewById(R.id.tv_data);
         dialog = (ProgressBar) findViewById(R.id.scan);
+        layout = (ConstraintLayout) findViewById(R.id.layout);
     }
 
     private void checkBLESupported() {
@@ -104,7 +109,7 @@ public class MainActivity extends AppCompatActivity {
                 public void run() {
                     mScanning = false;
                     mBluetoothAdapter.stopLeScan(mLeScanCallback);
-                    invalidateOptionsMenu();
+                    updateStatus();
                 }
             }, SCAN_PERIOD);
 
@@ -118,7 +123,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void updateStatus() {
-        dialog.setEnabled(mScanning);
+        dialog.setVisibility(mScanning? View.VISIBLE:View.GONE);
     }
 
 
