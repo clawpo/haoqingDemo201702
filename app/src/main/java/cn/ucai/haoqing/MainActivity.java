@@ -3,12 +3,19 @@ package cn.ucai.haoqing;
 import android.app.Activity;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
+import android.bluetooth.BluetoothGattCharacteristic;
+import android.bluetooth.BluetoothGattService;
 import android.bluetooth.BluetoothManager;
+import android.content.BroadcastReceiver;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
+import android.content.ServiceConnection;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.IBinder;
 import android.support.constraint.ConstraintLayout;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
@@ -17,10 +24,14 @@ import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import static cn.ucai.haoqing.GattAttributes.DEVICE_NAME_YUNMAI_WEIGHT;
 import static cn.ucai.haoqing.GattAttributes.SCAN_PERIOD;
 
 public class MainActivity extends AppCompatActivity {
+    private static final String TAG = "MainActivity";
 
     private BluetoothAdapter mBluetoothAdapter;
     private boolean mScanning,isConnected;
@@ -31,6 +42,9 @@ public class MainActivity extends AppCompatActivity {
     ProgressBar dialog;
     ConstraintLayout layout;
     BluetoothDevice yunmaiDevice;
+    private BluetoothLeService mBluetoothLeService;
+    private ArrayList<ArrayList<BluetoothGattCharacteristic>> mGattCharacteristics =
+            new ArrayList<ArrayList<BluetoothGattCharacteristic>>();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -40,6 +54,7 @@ public class MainActivity extends AppCompatActivity {
         mHandler = new Handler();
         checkBLESupported();
         setListener();
+
     }
 
     private void setListener() {
@@ -49,6 +64,7 @@ public class MainActivity extends AppCompatActivity {
                 scanLeDevice(true);
             }
         });
+        registerReceiver(mGattUpdateReceiver, makeGattUpdateIntentFilter());
     }
 
     private void initView() {
@@ -180,7 +196,152 @@ public class MainActivity extends AppCompatActivity {
         connectionYunMai();
     }
 
-    private void connectionYunMai() {
+    // Code to manage Service lifecycle.
+    private final ServiceConnection mServiceConnection = new ServiceConnection() {
 
+        @Override
+        public void onServiceConnected(ComponentName componentName, IBinder service) {
+            mBluetoothLeService = ((BluetoothLeService.LocalBinder) service).getService();
+            if (!mBluetoothLeService.initialize()) {
+                Log.e(TAG, "Unable to initialize Bluetooth");
+                finish();
+            }
+            // Automatically connects to the device upon successful start-up initialization.
+            mBluetoothLeService.connect(yunmaiDevice.getAddress());
+        }
+
+        @Override
+        public void onServiceDisconnected(ComponentName componentName) {
+            mBluetoothLeService = null;
+        }
+    };
+
+    private void connectionYunMai() {
+        Intent gattServiceIntent = new Intent(this, BluetoothLeService.class);
+        bindService(gattServiceIntent, mServiceConnection, BIND_AUTO_CREATE);
+        if (mBluetoothLeService != null) {
+            final boolean result = mBluetoothLeService.connect(yunmaiDevice.getAddress());
+            Log.d(TAG, "Connect request result=" + result);
+        }
+    }
+
+    // Handles various events fired by the Service.
+    // ACTION_GATT_CONNECTED: connected to a GATT server.
+    // ACTION_GATT_DISCONNECTED: disconnected from a GATT server.
+    // ACTION_GATT_SERVICES_DISCOVERED: discovered GATT services.
+    // ACTION_DATA_AVAILABLE: received data from the device.  This can be a result of read
+    //                        or notification operations.
+    private final BroadcastReceiver mGattUpdateReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            final String action = intent.getAction();
+            Log.e(TAG,"mGattUpdateReceiver,action="+action);
+            if (BluetoothLeService.ACTION_GATT_CONNECTED.equals(action)) {
+                isConnected = true;
+                updateConnectionState(R.string.connected);
+                invalidateOptionsMenu();
+            } else if (BluetoothLeService.ACTION_GATT_DISCONNECTED.equals(action)) {
+                isConnected = false;
+                updateConnectionState(R.string.disconnected);
+                invalidateOptionsMenu();
+                clearUI();
+            } else if (BluetoothLeService.ACTION_GATT_SERVICES_DISCOVERED.equals(action)) {
+                // Show all the supported services and characteristics on the user interface.
+                loadGattServices(mBluetoothLeService.getSupportedGattServices());
+            } else if (BluetoothLeService.ACTION_DATA_AVAILABLE.equals(action)) {
+                Log.e(TAG,"mGattUpdateReceiver,BluetoothLeService.ACTION_DATA_AVAILABLE");
+                displayWeightData(intent.getStringExtra(BluetoothLeService.DEVICE_DATA));
+            }
+        }
+    };
+
+    private void displayWeightData(String stringExtra) {
+        mtvData.setText(stringExtra);
+    }
+
+    private void loadGattServices(List<BluetoothGattService> gattServices) {
+        if (gattServices == null) return;
+        mGattCharacteristics = new ArrayList<ArrayList<BluetoothGattCharacteristic>>();
+        // Loops through available GATT Services.
+        for (BluetoothGattService gattService : gattServices) {
+
+            List<BluetoothGattCharacteristic> gattCharacteristics =
+                    gattService.getCharacteristics();
+            ArrayList<BluetoothGattCharacteristic> charas =
+                    new ArrayList<BluetoothGattCharacteristic>();
+
+            // Loops through available Characteristics.
+            for (BluetoothGattCharacteristic gattCharacteristic : gattCharacteristics) {
+                charas.add(gattCharacteristic);
+            }
+            mGattCharacteristics.add(charas);
+        }
+        autodisplayData();
+    }
+    private void autodisplayData() {
+        int groupPosition = 2;
+        int childPosition = 0;
+        Log.e(TAG,"autodisplayData,groupPosition="+groupPosition+",childPosition="+childPosition);
+        if (mGattCharacteristics != null) {
+            final BluetoothGattCharacteristic characteristic =
+                    mGattCharacteristics.get(groupPosition).get(childPosition);
+            Log.e(TAG,"characteristic="+characteristic);
+            final int charaProp = characteristic.getProperties();
+            Log.e(TAG,"charaProp="+charaProp);
+            if ((charaProp | BluetoothGattCharacteristic.PROPERTY_READ) > 0) {
+                // If there is an active notification on a characteristic, clear
+                // it first so it doesn't update the data field on the user interface.
+//                if (mNotifyCharacteristic != null) {
+//                    mBluetoothLeService.setCharacteristicNotification(
+//                            mNotifyCharacteristic, false);
+//                    mNotifyCharacteristic = null;
+//                }
+                Log.e(TAG,"mBluetoothLeService.readCharacteristic(characteristic)..");
+                mBluetoothLeService.readCharacteristic(characteristic);
+            }
+            if ((charaProp | BluetoothGattCharacteristic.PROPERTY_NOTIFY) > 0) {
+//                mNotifyCharacteristic = characteristic;
+                Log.e(TAG,"mBluetoothLeService.setCharacteristicNotification(characteristic)..");
+                mBluetoothLeService.setCharacteristicNotification(
+                        characteristic, true);
+            }
+        }
+    }
+
+    private void clearUI() {
+        mtvData.setText(R.string.no_data);
+    }
+
+    private void updateConnectionState(int connected) {
+        mtvStatus.setText(connected);
+    }
+
+    private static IntentFilter makeGattUpdateIntentFilter() {
+        final IntentFilter intentFilter = new IntentFilter();
+        intentFilter.addAction(BluetoothLeService.ACTION_GATT_CONNECTED);
+        intentFilter.addAction(BluetoothLeService.ACTION_GATT_DISCONNECTED);
+        intentFilter.addAction(BluetoothLeService.ACTION_GATT_SERVICES_DISCOVERED);
+        intentFilter.addAction(BluetoothLeService.ACTION_DATA_AVAILABLE);
+        return intentFilter;
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (mServiceConnection!=null) {
+            unbindService(mServiceConnection);
+            mBluetoothLeService = null;
+        }
+        if (mGattUpdateReceiver!=null) {
+            unregisterReceiver(mGattUpdateReceiver);
+        }
+    }
+
+    private void connectionDevices(boolean connection){
+        if (connection){
+            mBluetoothLeService.connect(yunmaiDevice.getAddress());
+        }else{
+            mBluetoothLeService.disconnect();
+        }
     }
 }
