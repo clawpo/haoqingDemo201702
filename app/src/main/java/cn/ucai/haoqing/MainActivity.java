@@ -1,5 +1,6 @@
 package cn.ucai.haoqing;
 
+import android.app.Activity;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothManager;
@@ -10,6 +11,8 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
+import android.widget.ProgressBar;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import static cn.ucai.haoqing.GattAttributes.DEVICE_NAME_YUNMAI_WEIGHT;
@@ -22,12 +25,21 @@ public class MainActivity extends AppCompatActivity {
     private Handler mHandler;
     private static final int REQUEST_ENABLE_BT = 1;
 
+    TextView mtvStatus;
+    ProgressBar dialog;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        initView();
         mHandler = new Handler();
         checkBLESupported();
+    }
+
+    private void initView() {
+        mtvStatus = (TextView) findViewById(R.id.tv_status);
+        dialog = (ProgressBar) findViewById(R.id.scan);
     }
 
     private void checkBLESupported() {
@@ -68,6 +80,22 @@ public class MainActivity extends AppCompatActivity {
         scanLeDevice(true);
     }
 
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        // User chose not to enable Bluetooth.
+        if (requestCode == REQUEST_ENABLE_BT && resultCode == Activity.RESULT_CANCELED) {
+            finish();
+            return;
+        }
+        super.onActivityResult(requestCode, resultCode, data);
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        scanLeDevice(false);
+    }
+
     private void scanLeDevice(final boolean enable) {
         if (enable) {
             // Stops scanning after a pre-defined scan period.
@@ -86,7 +114,11 @@ public class MainActivity extends AppCompatActivity {
             mScanning = false;
             mBluetoothAdapter.stopLeScan(mLeScanCallback);
         }
-        invalidateOptionsMenu();
+        updateStatus();
+    }
+
+    private void updateStatus() {
+        dialog.setEnabled(mScanning);
     }
 
 
