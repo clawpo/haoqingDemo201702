@@ -12,14 +12,15 @@ import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.widget.Toast;
 
+import static cn.ucai.haoqing.GattAttributes.DEVICE_NAME_YUNMAI_WEIGHT;
+import static cn.ucai.haoqing.GattAttributes.SCAN_PERIOD;
+
 public class MainActivity extends AppCompatActivity {
 
     private BluetoothAdapter mBluetoothAdapter;
     private boolean mScanning;
     private Handler mHandler;
     private static final int REQUEST_ENABLE_BT = 1;
-    // Stops scanning after 10 seconds.
-    private static final long SCAN_PERIOD = 20000;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -89,7 +90,6 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
-    public static String DEVICE_NAME_YUNMAI_WEIGHT = "YUNMAI-SIGNAL-CW";
     // Device scan callback.
     private BluetoothAdapter.LeScanCallback mLeScanCallback =
             new BluetoothAdapter.LeScanCallback() {
